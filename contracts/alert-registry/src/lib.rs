@@ -3586,45 +3586,16 @@ impl AlertRegistry {
 
     /// Get the number of currently active alerts owned by `owner`.
     ///
-    /// Unlike [`AlertRegistry::get_alert_count`], this reflects removals and only counts
-    /// alerts with `active == true` — deactivated-but-not-removed alerts are
-    /// excluded, so the result matches the `active` flag of the alerts
-    /// returned by [`AlertRegistry::get_alerts_by_owner`].
-    ///
-    /// Backed by a running [`DataKey::OwnerActiveCount`] counter maintained
-    /// incrementally alongside [`DataKey::OwnerIndex`] by
-    /// [`AlertRegistry::push_owner_index`], [`AlertRegistry::remove_from_owner_index`],
-    /// [`AlertRegistry::update_alert`], [`AlertRegistry::set_alert_active`],
-    /// [`AlertRegistry::deactivate_all_alerts`], and
-    /// [`AlertRegistry::deactivate_alert_by_admin`], so this is an O(1) lookup
-    /// regardless of how many alerts `owner` has ever registered — it never
-    /// rescans the owner's index.
-    /// Backed by the running [`DataKey::OwnerActiveCount`] counter, which every
-    /// mutator that flips the `active` flag, moves an alert between owners, or
-    /// removes it keeps in step. Reads are **O(1)**: the owner's index is not
-    /// rescanned (#385). On a counter miss (an alert registered before the
-    /// counter existed) the value is rebuilt once from the index and then
-    /// maintained incrementally. For the live (non-removed) count regardless of
-    /// the `active` flag, use [`AlertRegistry::get_non_removed_alert_count`].
-    /// Scans the owner's [`DataKey::OwnerIndex`] and reads the cheap
-    /// [`DataKey::AlertActive`] flag for each entry, so it reflects both
-    /// removals and deactivations. If you only need the number of live
-    /// (non-removed) alerts regardless of the `active` flag, use
-    /// [`AlertRegistry::get_non_removed_alert_count`], which is an O(1) lookup.
-    #[deprecated(
-        since = "0.3.0",
-        note = "This function scans the owner's index; use per-owner counters instead"
-    ///
-    /// **Deprecated since 0.2.0, removal in 0.4.0:** the scan over the owner
-    /// index grows with the number of alerts the owner has ever registered.
-    /// Prefer [`AlertRegistry::get_non_removed_alert_count`] (O(1)) when the
-    /// live count is enough, or page the alerts with
-    /// [`AlertRegistry::get_alerts_by_owner_paginated`] and filter on `active`
-    /// (#384).
-    #[deprecated(
-        since = "0.2.0",
-        note = "unbounded scan; prefer get_non_removed_alert_count or paginated reads (removed in 0.4.0)"
-    )]
+    /// Unlike [`AlertRegistry::get_alert_count`], this reflects removals and only
+    /// counts alerts with `active == true`; deactivated-but-not-removed alerts
+    /// are excluded. Reads are **O(1)**: it returns the running
+    /// [`DataKey::OwnerActiveCount`] counter, which every mutator that flips the
+    /// `active` flag, moves an alert between owners, or removes it keeps in
+    /// step (#385), and never rescans the owner's index. On a counter miss (an
+    /// alert registered before the counter existed) the value is rebuilt once
+    /// from the index and then maintained incrementally. For the live count
+    /// regardless of the `active` flag, use
+    /// [`AlertRegistry::get_non_removed_alert_count`].
     #[must_use]
     pub fn get_active_alert_count(env: Env, owner: Address) -> u32 {
         Self::owner_active_count(&env, &owner)
