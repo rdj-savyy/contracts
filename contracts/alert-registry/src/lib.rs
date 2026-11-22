@@ -3651,18 +3651,6 @@ impl AlertRegistry {
     /// count as live until they are removed.
     pub fn get_active_contract_alert_count(env: Env, target_contract: Address) -> u32 {
         Self::contract_live_count(&env, &target_contract)
-        let ids = Self::contract_index(&env, &target_contract);
-        let mut count: u32 = 0;
-        for id in ids.iter() {
-            if env
-                .storage()
-                .persistent()
-                .get::<DataKey, bool>(&DataKey::AlertActive(id))
-                == Some(true)
-            {
-                count += 1;
-            }
-        }
         count
     }
 
